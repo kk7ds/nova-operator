@@ -46,6 +46,8 @@ var _ = Describe("Nova controller", func() {
 	var apiTransportURLName types.NamespacedName
 	var novaSchedulerName types.NamespacedName
 	var novaSchedulerStatefulSetName types.NamespacedName
+	var novaMetadataName types.NamespacedName
+	var novaMetadataStatefulSetName types.NamespacedName
 
 	BeforeEach(func() {
 		// NOTE(gibi): We need to create a unique namespace for each test run
@@ -120,6 +122,14 @@ var _ = Describe("Nova controller", func() {
 		novaSchedulerStatefulSetName = types.NamespacedName{
 			Namespace: namespace,
 			Name:      novaSchedulerName.Name,
+		}
+		novaMetadataName = types.NamespacedName{
+			Namespace: namespace,
+			Name:      novaName.Name + "-metadata",
+		}
+		novaMetadataStatefulSetName = types.NamespacedName{
+			Namespace: namespace,
+			Name:      novaMetadataName.Name,
 		}
 	})
 
@@ -313,6 +323,7 @@ var _ = Describe("Nova controller", func() {
 			th.SimulateJobSuccess(cell0DBSyncJobName)
 			th.SimulateStatefulSetReplicaReady(novaCell0ConductorStatefulSetName)
 			th.SimulateStatefulSetReplicaReady(novaSchedulerStatefulSetName)
+			th.SimulateStatefulSetReplicaReady(novaMetadataStatefulSetName)
 
 			api := GetNovaAPI(novaAPIName)
 			Expect(api.Spec.APIMessageBusSecretName).To(Equal("rabbitmq-secret"))
@@ -349,6 +360,7 @@ var _ = Describe("Nova controller", func() {
 			th.SimulateStatefulSetReplicaReady(novaCell0ConductorStatefulSetName)
 			th.SimulateStatefulSetReplicaReady(novaAPIdeploymentName)
 			th.SimulateKeystoneEndpointReady(novaAPIKeystoneEndpointName)
+			th.SimulateStatefulSetReplicaReady(novaMetadataStatefulSetName)
 
 			scheduler := GetNovaScheduler(novaSchedulerName)
 			Expect(scheduler.Spec.APIMessageBusSecretName).To(Equal("rabbitmq-secret"))
@@ -364,6 +376,40 @@ var _ = Describe("Nova controller", func() {
 				novaName,
 				ConditionGetterFunc(NovaConditionGetter),
 				novav1.NovaSchedulerReadyCondition,
+				corev1.ConditionTrue,
+			)
+			th.ExpectCondition(
+				novaName,
+				ConditionGetterFunc(NovaConditionGetter),
+				condition.ReadyCondition,
+				corev1.ConditionTrue,
+			)
+		})
+		It("create NovaMetadata", func() {
+			th.SimulateKeystoneServiceReady(novaKeystoneServiceName)
+			th.SimulateMariaDBDatabaseCompleted(mariaDBDatabaseNameForAPI)
+			th.SimulateMariaDBDatabaseCompleted(mariaDBDatabaseNameForCell0)
+			th.SimulateTransportURLReady(apiTransportURLName)
+			th.SimulateJobSuccess(cell0DBSyncJobName)
+			th.SimulateStatefulSetReplicaReady(novaCell0ConductorStatefulSetName)
+			th.SimulateStatefulSetReplicaReady(novaAPIdeploymentName)
+			th.SimulateKeystoneEndpointReady(novaAPIKeystoneEndpointName)
+			th.SimulateStatefulSetReplicaReady(novaSchedulerStatefulSetName)
+
+			metadata := GetNovaMetadata(novaMetadataName)
+			Expect(metadata.Spec.APIMessageBusSecretName).To(Equal("rabbitmq-secret"))
+			th.SimulateStatefulSetReplicaReady(novaMetadataStatefulSetName)
+
+			th.ExpectCondition(
+				novaMetadataName,
+				ConditionGetterFunc(NovaMetadataConditionGetter),
+				condition.DeploymentReadyCondition,
+				corev1.ConditionTrue,
+			)
+			th.ExpectCondition(
+				novaName,
+				ConditionGetterFunc(NovaConditionGetter),
+				novav1.NovaMetadataReadyCondition,
 				corev1.ConditionTrue,
 			)
 			th.ExpectCondition(
@@ -517,6 +563,7 @@ var _ = Describe("Nova controller", func() {
 			th.SimulateJobSuccess(cell0DBSyncJobName)
 			th.SimulateStatefulSetReplicaReady(novaCell0ConductorStatefulSetName)
 			th.SimulateStatefulSetReplicaReady(novaSchedulerStatefulSetName)
+			th.SimulateStatefulSetReplicaReady(novaMetadataStatefulSetName)
 
 			configDataMap := th.GetConfigMap(
 				types.NamespacedName{
@@ -729,6 +776,10 @@ var _ = Describe("Nova controller", func() {
 			)
 			SimulateStatefulSetReplicaReadyWithPods(
 				novaAPIdeploymentName,
+				map[string][]string{namespace + "/internalapi": {"10.0.0.1"}},
+			)
+			SimulateStatefulSetReplicaReadyWithPods(
+				novaMetadataStatefulSetName,
 				map[string][]string{namespace + "/internalapi": {"10.0.0.1"}},
 			)
 			th.SimulateKeystoneEndpointReady(novaAPIKeystoneEndpointName)

@@ -91,6 +91,8 @@ var _ = Describe("Nova controller", func() {
 	var novaKeystoneServiceName types.NamespacedName
 	var novaSchedulerName types.NamespacedName
 	var novaSchedulerStatefulSetName types.NamespacedName
+	var novaMetadataName types.NamespacedName
+	var novaMetadataStatefulSetName types.NamespacedName
 
 	BeforeEach(func() {
 		// NOTE(gibi): We need to create a unique namespace for each test run
@@ -141,6 +143,14 @@ var _ = Describe("Nova controller", func() {
 		novaSchedulerStatefulSetName = types.NamespacedName{
 			Namespace: namespace,
 			Name:      novaSchedulerName.Name,
+		}
+		novaMetadataName = types.NamespacedName{
+			Namespace: namespace,
+			Name:      novaName.Name + "-metadata",
+		}
+		novaMetadataStatefulSetName = types.NamespacedName{
+			Namespace: namespace,
+			Name:      novaMetadataName.Name,
 		}
 		cell0 = NewCell(novaName, "cell0")
 		cell1 = NewCell(novaName, "cell1")
@@ -414,6 +424,7 @@ var _ = Describe("Nova controller", func() {
 			th.SimulateStatefulSetReplicaReady(novaAPIdeploymentName)
 			th.SimulateKeystoneEndpointReady(novaAPIKeystoneEndpointName)
 			th.SimulateStatefulSetReplicaReady(novaSchedulerStatefulSetName)
+			th.SimulateStatefulSetReplicaReady(novaMetadataStatefulSetName)
 			th.SimulateMariaDBDatabaseCompleted(cell1.MariaDBDatabaseName)
 			th.SimulateTransportURLReady(cell1.TransportURLName)
 			th.SimulateJobSuccess(cell1.CellDBSyncJobName)
@@ -649,6 +660,7 @@ var _ = Describe("Nova controller", func() {
 				corev1.ConditionTrue,
 			)
 
+			th.SimulateStatefulSetReplicaReady(novaMetadataStatefulSetName)
 			// As cell0 is ready API is deployed
 			th.SimulateStatefulSetReplicaReady(novaAPIdeploymentName)
 			th.SimulateKeystoneEndpointReady(novaAPIKeystoneEndpointName)
